@@ -1,0 +1,94 @@
+const _query = {
+   counts: function() {
+      var query = 'SELECT count(*) FROM network_error';
+      return query
+   },
+   selectAll:function(){
+      return 'SELECT * from network_error;'
+   },
+   selectOne:function(seq){
+      var _seq = seq;
+      var query = 'select * from network_error where id='+_seq;
+      return query;
+   },
+   insert:function(data){
+      var _data = data;
+      var _recordTime = '"'+_data.recordTime+'"' || null;
+      var _errorTime = '"'+_data.errorTime+'"' || null;
+      var _url = _data.url || null;
+      var _port = _data.port || 0;
+      var _deviceId = _data.deviceId || 0;
+      var _location = _data.location || null;
+      var _siteId = _data.siteId || 1;
+      var _result = _data.result || null;
+
+      var query = 'INSERT INTO network_error (record_time, error_time, url, port, device_id, location, site_id, result) '
+                  +'VALUES ('+_recordTime+', '+_errorTime+',"'+_url+'", '+_port+', '+_deviceId+', "'+_location+'", '+_siteId+', "'+_result+'" );';
+
+      return query;
+   },
+   restoreUpdate:function(data){
+      var _data = data;
+      var _recordTime = '"'+_data.recordTime+'"' || null;
+      var _errorTime = '"'+_data.errorTime+'"' || null;
+      var _restoreTime = '"'+_data.restoreTime+'"' || null;
+      var _result = _data.result;
+      var _url = _data.url;
+      var _port = _data.port;
+      var _count = _data.count || 0;
+
+      var query = 'UPDATE network_error SET '
+                +'record_time='+_recordTime+', '
+                +'restore_time='+_restoreTime+', '
+                +'count='+_count+', '
+                +'result="'+_result+'" '
+                +'WHERE error_time='+_errorTime+' AND port="'+_port+'";';
+      return query;
+   },
+   delete:function(id){
+      var _id = id;
+      var _query = 'DELETE FROM network_error WHERE id='+_id;
+
+       return _query;
+
+   },
+   findBysite:function(param){
+      var _siteId = param;
+      var query = 'select * from network_error where site_id='+_siteId;
+      return query;
+   },
+   findBytermNsiteId: function(data){
+      var _data = data;
+      var _startDate = data.startDate;
+      var _endDate = data.endDate;
+      var _siteId = data.siteId;
+
+      var query = 'SELECT * FROM network_error '
+               +'WHERE (DATE_FORMAT(error_time,"%Y-%m-%d %H:%i:%S") '
+               +'BETWEEN DATE_FORMAT("'+_startDate+'", "%Y-%m-%d %H:%i:%S") '
+               +'AND DATE_FORMAT("'+_endDate+'","%Y-%m-%d %H:%i:%S")) AND site_id ='+_siteId+'  ORDER BY location asc;';
+
+      return query;
+   },
+   findBytermNdeviceNsiteId: function(data){
+      var _data = data;
+      var _startDate = data.startDate;
+      var _endDate = data.endDate;
+      var _siteId = data.siteId;
+      var _deviceId = data.deviceId;
+
+      var query = 'SELECT * FROM network_error '
+               +'WHERE (DATE_FORMAT(error_time,"%Y-%m-%d %H:%i:%S") '
+               +'BETWEEN DATE_FORMAT("'+_startDate+'", "%Y-%m-%d %H:%i:%S") '
+               +'AND DATE_FORMAT("'+_endDate+'","%Y-%m-%d %H:%i:%S")) AND device_id='+_deviceId+' AND site_id ='+_siteId+'  ORDER BY location asc;';
+
+      return query;
+   },
+   findBylocation: function(param){
+      var _siteId = param;
+       var query = 'SELECT * FROM error_location_view WHERE site_id='+_siteId+' ORDER BY device_name ASC';
+       return query;
+   }
+}
+
+module.exports=_query;

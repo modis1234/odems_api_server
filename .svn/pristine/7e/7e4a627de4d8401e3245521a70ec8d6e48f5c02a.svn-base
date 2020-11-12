@@ -1,0 +1,189 @@
+const _query = {
+   counts: function() {
+      var query = 'SELECT count(*) FROM ups';
+      return query
+   },
+   selectAll: function(){
+      return 'SELECT * FROM ups';
+   },
+   selectOne: function(id){
+      var _id = id;
+      var query = 'SELECT * FROM ups where id='+_id;
+      return query;
+   },
+   siteSelect: function(siteId){
+      var _siteId = siteId;
+
+      var query = 'SELECT * FROM ups WHERE site_id='+_siteId+';';
+      return query;
+   },
+   selectNetworkInfo: function(){
+      var query = 'SELECT * FROM network_ups_view';
+      return query;
+   },
+   insert: function(data){
+      var _data = data;
+      var _createdDate = _data.createDate;
+      var _localIdx = _data.localIdx;
+      var _companyId = _data.companyId;
+      var _location = _data.location;
+
+      var query = 'INSERT INTO ups (create_date, local_idx, company_id, location) VALUES ("'+_createdDate+'","'+_localIdx+'", '+_companyId+', "'+_location+'"); ';
+
+      return query;
+   },
+   update: function(data){
+      var _data = data;
+      var _id = _data.id;
+      var _modifiedDate = _data.modifiedDate;
+      var _localIdx = _data.localIdx;
+      var _companyId = _data.companyId;
+      var _location = _data.location;
+     
+     var query = 'UPDATE ups SET modified_date="'+_modifiedDate+'", local_idx="'+_localIdx+'", company_id='+_companyId+', location="'+_location+'" WHERE id='+_id+';';
+
+     return query;
+
+   },
+   recordUpdate: function(data){
+      var _data = data;
+      var _id = data.id;
+      var _recordTime = data.recordTime;
+      var _deviceIdx = data.ups_idx;
+      var _voltIn = data.volt_in;
+      var _voltOut = data.volt_out;
+      var _freqIn = data.freq_in;
+      var _freqOut = data.freq_out;
+      var _loaded = data.loaded;
+      var _batteryRemain = data.battery_remain;
+      var _stateBattery = data.state_battery;
+      var _stateLine = data.state_line;
+      var _stateAVR = data.state_avr;
+      var _errorType = data.errorType || 0;
+      var _useTime=(_errorType === 1) ? data.useTime : 0;
+      
+      var query = 'UPDATE ups SET '
+            +'volt_in='+_voltIn+', '
+            +'volt_out='+_voltOut+', '
+            +'freq_in='+_freqIn+', '
+            +'freq_out='+_freqOut+', '
+            +'loaded='+_loaded+', '
+            +'battery_remain='+_batteryRemain+', '
+            +'state_battery='+_stateBattery+', '
+            +'state_line='+_stateLine+', '
+            +'state_avr='+_stateAVR+', '
+            +'error_type='+_errorType+', '
+            +'use_time='+_useTime+', '
+            +'record_time="'+_recordTime+'" '
+            +'WHERE device_idx = "'+_deviceIdx+'";'
+      return query
+
+   },
+   delete: function(id){
+      var _id = id;
+      
+      var query = 'DELETE FROM ups where id='+id;
+      return query;
+   },
+   network_record: function(){
+
+   },
+   insert_log: function(data){
+      var _data = data;
+      //console.log(">>>",_data);
+
+      var _recordTime = data.recordTime;
+      var _upsIdx = _data.ups_idx;
+      var _voltIn = _data.volt_in;
+      var _voltOut = _data.volt_out;
+      var _freqIn = _data.freq_in;
+      var _freqOut = _data.freq_out;
+      var _loaded = _data.loaded;
+      var _batteryRemain = _data.battery_remain;
+      var _stateBattery = _data.state_battery;
+      var _stateLine = _data.state_line;
+      var _stateAVR = _data.state_avr;
+      var _upsStatus  = _data.upsStatus || 0;
+      var _useTime = _data.useTime || 0;
+
+      var query = 'INSERT INTO ups_log '
+                  +'(record_time, ups_idx, volt_in, volt_out, freq_in, freq_out, loaded, '
+                  +'battery_remain, state_battery, state_line, state_avr, ups_status, use_time) '
+                  +'VALUES ("'+_recordTime+'", "'+_upsIdx+'", '+_voltIn+', '+_voltOut+', '+_freqIn+', '+_freqOut+', '+_loaded+', '+_batteryRemain+', '+_stateBattery+', '+_stateLine+', '+_stateAVR+', '+_upsStatus+', '+_useTime+');'
+      return query
+
+   },
+   error_blackout: function(data){
+      var _data = data;
+
+      var _recordTime = data.recordTime;  //이벤트 발생시간
+      var _restoreTime = _data.restoreTime || null; //복구시간
+      var _localIndex = _data.local_idx; 
+      var _upsIdx = _data.ups_idx;    
+      var _loaded = _data.loaded;
+      var _batteryRemain = _data.battery_remain;
+      var _stateBattery = _data.state_battery;
+      var _stateLine = _data.state_line;
+      var _stateAVR = _data.state_avr; //
+      var _useTime = _data.useTime; //배터리 사용가능시간
+      var _blackoutTime = _data.blackoutTime; //정전시간
+      var _dischargeTime = _data.dischargeTime || null; //방전시간
+      var _errorType = _data.errorType;  //0: 정상, 1:정전, 2:방전
+      
+      var query = 'INSERT INTO ups_error '
+                 +'(record_time, restore_time, ups_idx, local_idx, loaded, battery_remain, state_battery, state_line, state_avr, ' 
+                 +'use_time, blackout_time, discharge_time, error_type) '
+                 +'VALUES ("'+_recordTime+'", null, "'+_upsIdx+'", "'+_localIndex+'",'+_loaded+', '+_batteryRemain+', '+_stateBattery+', '
+                 +_stateLine+', '+_stateAVR+', '+_useTime+', "'+_blackoutTime+'", null, '+_errorType+');';
+      return query;
+      
+   },
+   error_discharge: function(data){
+      var _data = data;
+      var _recordTime = data.recordTime;  //이벤트 발생시간
+      var _localIndex = _data.local_idx; 
+      var _upsIdx = _data.ups_idx;    
+      var _loaded = _data.loaded;
+      var _batteryRemain = _data.battery_remain;
+      var _stateBattery = _data.state_battery;
+      var _stateLine = _data.state_line;
+      var _stateAVR = _data.state_avr; //
+      var _useTime = _data.useTime; //배터리 사용가능시간
+      var _blackoutTime = _data.blackoutTime; //정전시간
+      var _dischargeTime = _data.dischargeTime || null; //방전시간
+      var _errorType = _data.errorType;  //0: 정상, 1:정전, 2:방전
+
+      var query ='UPDATE ups_error '
+            +'SET record_time="'+_recordTime+'", discharge_time="'+_dischargeTime+'", loaded='+_loaded+', '
+            +'battery_remain='+_batteryRemain+', state_line='+_stateLine+', error_type='+_errorType+' '
+            +'WHERE DATE_FORMAT(blackout_time, "%Y-%m-%d %H:%i:%S") = DATE_FORMAT("'+_blackoutTime+'","%Y-%m-%d %H:%i:%S");';
+      return query;
+
+   },
+   error_restore: function(data){
+      var _data =data;
+      var _recordTime = data.recordTime;  // 이벤트 발생
+      var _restoreTime = _data.restoreTime || null; //복구시간
+      var _loaded = _data.loaded;
+      var _batteryRemain = _data.battery_remain;
+      var _stateLine = _data.state_line;
+      var _useTime = _data.useTime; //배터리 사용가능시간
+      var _blackoutTime = _data.blackoutTime; //정전시간
+      var _errorType = _data.errorType;  //0: 정상, 1:정전, 2:방전
+
+      var query ='UPDATE ups_error '
+               +'SET record_time="'+_recordTime+'", restore_time="'+_restoreTime+'", loaded='+_loaded+', '
+               +'battery_remain='+_batteryRemain+', state_line='+_stateLine+', error_type='+_errorType+' '
+               +'WHERE DATE_FORMAT(blackout_time, "%Y-%m-%d %H:%i:%S") = DATE_FORMAT("'+_blackoutTime+'","%Y-%m-%d %H:%i:%S");';
+      return query;
+    },
+    upsDeviceSelect: function(siteId){
+      var _siteId = siteId;
+      var query ='SELECT * FROM ups_device_view WHERE site_id='+_siteId;
+      return query;
+   }
+
+
+}
+
+module.exports=_query;

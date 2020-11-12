@@ -1,0 +1,41 @@
+const _query = {
+   counts: function() {
+      var query = 'SELECT count(*) FROM network_error';
+      return query
+   },
+   selectAll:function(){
+      return 'SELECT * from network_error;'
+   },
+   selectOne:function(seq){
+      var _seq = seq;
+      var query = 'select * from network_error where id='+_seq;
+      return query;
+   },
+   insert:function(data){
+      var _data = data;
+      var _recordTime = '"'+_data.recordTime+'"' || null;
+      var _url = _data.url || null;
+      var _port = _data.port || 0;
+      var _neType = _data.neType || 1;
+      var _location = _data.location || null;
+      var _companyId = _data.companyId || 1;
+      var _result = _data.result || null;
+
+      var query = 'INSERT INTO network_error (record_time, url, port, ne_type, location, company_id, result) '
+                  +'VALUES ('+_recordTime+', "'+_url+'", '+_port+', '+_neType+', "'+_location+'", '+_companyId+', "'+_result+'" );';
+
+      return query;
+   },
+   update:function(data){
+      
+   },
+   delete:function(id){
+      var _id = id;
+      var _query = 'DELETE FROM network_error WHERE id='+_id;
+
+       return _query;
+
+   }
+}
+
+module.exports=_query;

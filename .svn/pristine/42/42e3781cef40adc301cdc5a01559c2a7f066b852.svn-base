@@ -1,0 +1,464 @@
+var express = require('express');
+var router = express.Router();
+var mysql = require("mysql");
+var dbconfig = require('./config/database');
+var queryconfig = require('./query/ups_query');
+var error_queryconfig = require('./query/error_query');
+var network_queryconfig = require('./query/network_query');
+
+// 알람 config
+var alarm = require('./config/alarm');
+
+
+
+var conn = mysql.createConnection(dbconfig);
+
+var moment = require('moment');
+require('moment-timezone');
+moment.tz.setDefault("Asia/Seoul");
+
+var networkInfoList;
+function networkUpsInfo(){
+    var _query = queryconfig.selectNetworkInfo();
+    conn.query(_query, function(err, rows, fields) {
+        if(err){
+            console.log(err);
+        }else{
+            networkInfoList = rows;
+        }
+    });
+}
+
+networkUpsInfo();
+
+//조회
+router.get('/', function(req, res, next) {
+    var _query = queryconfig.selectAll();
+    conn.query(_query, function(err, rows, fields) {
+        if(err){
+            console.log(err);
+            res.status(404).end();
+        }else{
+            res.json(rows);
+        }
+    });
+});
+
+//사이트 별 조회
+router.get('/:siteId', function(req, res, next) {
+    var _this = this;
+    var _siteId = req.params.siteId;
+  
+    var _query = queryconfig.siteSelect(_siteId);
+    conn.query(_query, function(err, rows, fields) {
+        if(err) {
+           res.status(404).end();
+        }else {
+          res.json(rows);
+        }
+    });
+  });
+
+
+//id 조회
+/*
+    @param id
+*/
+router.get('/:id', function(req, res, next) {
+    var _id = req.params.id;
+
+    var _query = queryconfig.selectOne(_id);
+    conn.query(_query, function(err, rows, fields) {
+        if(err){
+            console.log(err);
+            res.status(404).end();
+        }else{
+            res.json(rows);
+        }
+    });
+});
+
+// ups_devcie_view 테이블 조회 라우터
+/* 
+    @param siteId
+*/
+router.get('/device/:siteId', function(req, res, next) {
+    let siteId = req.params.siteId;
+    var _query = queryconfig.upsDeviceSelect(siteId);
+
+    conn.query(_query, function(err, rows, fields) {
+        if(err) {
+            res.status(404).end();
+        } else {
+            res.json(rows);
+        }
+    });
+
+});
+
+// 입력
+/*
+    @body localIdx
+    @body companyId
+    @body locationId
+
+*/
+router.post('/', function(req, res, next) {
+    var createdDate = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+    var _body = req.body;
+    _body.createdDate = createdDate;
+
+    var _query = queryconfig.insert(_body);
+    conn.query(_query, function(err, rows,fields) {
+        if(err){
+            res.status(404).end();
+        }else {
+            res.json(rows);
+        }
+    });
+});
+//수정
+/*
+  @param id
+  @body siteName
+  @body upsName
+*/
+router.put('/:id',function(req, res, next) {
+    var _id = req.params.id;
+    var _body = req.body;
+    _body.id = _id;
+   // console.log(_body);
+    var _query = queryconfig.update(_body);
+
+    conn.query(_query, function(err, rows,fields) {
+        if(err){
+            res.status(404).end();
+        }else {
+            res.json(rows);
+        }
+    });
+});
+
+//삭제
+/*
+  @param id
+*/
+router.delete('/:id', function(req, res, next){
+    var _id = req.params.id;
+
+    var _query = queryconfig.delete(_id);
+    //console.log(_query);
+    // conn.query(_query, function(err, rows, fields){
+    //     if(err){
+    //         res.status(404).end();
+    //     }else {
+    //         res.json(rows);
+    //     }
+    // });
+    
+});
+
+
+//UPS 데이터 처리
+/* 
+    @body local_idx
+    @body volt_in
+    @body volt_out
+    @body freq_in
+    @body freq_out
+    @body loaded
+    @body battery_remain
+    @body state_battery
+    @body state_line
+    @body state_avr
+*/
+
+var upsObj ={};
+var errorObj = {};
+router.post('/status',function(req, res, next){
+    var _query;
+    var recordTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+    var _body = req.body;
+    var _idx = _body[0].ups_idx;
+   _body[0].recordTime = recordTime;
+    _body[0].result="open";
+    _body[0].errorTime=null;
+    networkResult(_body[0]);
+    // 장애 판단 로직   
+    // enums 0=정전/1=방전/2=네트워크장애
+    // 1. 정전(state_line=1)
+    var stateLine = parseInt(_body[0].state_line);
+    var stateBattery = parseInt(_body[0].state_battery);
+    var network = networkInfoList.filter(function(obj){
+        if(obj.device_index === _idx){
+            return obj;
+        }
+    });
+    var deviceInfo = network[0];
+    deviceInfo.sendYN = 'N';
+    var _totalBattery = deviceInfo.battery_capacity; // 총배터리량
+    var _maxUsedPower = deviceInfo.max_power; // 최대사용가능 전력
+    if(stateLine === 1 ){
+        upsObj[_idx].errorType = 1;
+
+        console.log("정전!!");
+        var _blackOutBody = _body[0];
+        _blackOutBody.recordTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+        _blackOutBody.blackoutTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+        _blackOutBody.errorType = 1;
+        
+        // 배터리 사용가능시간 계산식
+            var _powerEfficiency = _maxUsedPower * 0.7; // 전력사용효율
+            var _batteryRemain = _body[0].battery_remain; // 배터리 잔량(%)
+            var _batteryUseEfficiency = (_batteryRemain-30)/100; // 배터리 사용 효율
+            var _loaded = _body[0].loaded; //전력 사용률(%)
+        if(_batteryUseEfficiency > 0){
+            var _batteryRemainVolume = _totalBattery * _batteryUseEfficiency; // 시간 계산용 배터리 용량   
+            var _usedPower = _powerEfficiency * _loaded/100 // 전력 사용량
+            var _buttreryTime = _batteryRemainVolume/_usedPower;
+            var powerUsedTime = Math.round((_buttreryTime)*100)/100; //전원사용가능시간
+            _blackOutBody.useTime =powerUsedTime;  
+            //시간 변환    
+            var usedTime = String(powerUsedTime);
+            var subTime = usedTime.split('.');
+            var usedHour = subTime[0];
+            if(subTime[1]){
+                var subMin = (subTime[1].length !== 1)?subTime[1]:subTime[1]+"0";
+                var usedMinute = Math.round(60 * (subMin/100));
+                console.log(usedHour,'시간',usedMinute,'분')
+            }else {
+                console.log(usedHour,'시간')
+            }
+             _body[0].useTime = powerUsedTime;    
+        }else if(_batteryUseEfficiency <= 0){
+                _body[0].useTime =0;
+        } // end 시간 계산
+        //정전발생 이력 기록
+        if(!errorObj.hasOwnProperty(_idx)){
+            errorObj[_idx] = _blackOutBody;
+            console.log("###################>>>>>>",_blackOutBody);
+            _query = queryconfig.error_blackout(_blackOutBody);
+            conn.query(_query, function(err, rows, fields){
+                if(err){
+                        console.log(err)
+                    }else {
+                        //res.json(rows);
+                        console.log("blackout!!");
+
+                        setTimeout(function(){
+                            // 알림메시지 전송
+                            var blackOutObj = {};
+                            blackOutObj.deviceIndex = _blackOutBody.ups_idx; 
+                            blackOutObj.errorType = _blackOutBody.errorType;
+                            blackOutObj.useTime = _blackOutBody.useTime;
+                            alarm.send(blackOutObj);
+                        },60000);
+
+                        
+                    }
+                });
+        }
+        insertLog(_body[0]);
+    } // end  정전 발생(stateLine = 1)
+    else if(stateLine === 0){
+        //정전 후 정상 복구 이력 기록
+        var errorHasProperty = errorObj.hasOwnProperty(_idx);
+        if(errorHasProperty){
+            var restoreObj = _body[0];
+            var recordTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+            restoreObj.recordTime = recordTime;
+            restoreObj.restoreTime = recordTime;
+            restoreObj.blackoutTime = errorObj[_idx].blackoutTime;
+            restoreObj.errorType = 0;
+            delete errorObj[_idx];
+            upsErrorRestore(restoreObj);           
+        }        
+        insertLog(_body[0]);
+    } // end 정전 복구(stateLine = 0)
+    
+    var hasProperty = upsObj.hasOwnProperty(_idx);
+    var count = 20;
+    if(!hasProperty){
+        _body[0].receiveTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+        _body[0].counter = setInterval(upsHandler,1000);    
+        upsObj[_idx]=_body[0];
+    } else {
+        clearInterval(upsObj[_idx].counter);
+        _body[0].receiveTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+        _body[0].counter = setInterval(upsHandler,1000);    
+        upsObj[_idx]=_body[0];
+    }
+    resultScan(upsObj[_idx]);
+    // console.log(upsObj[_idx])
+    res.end();
+
+    function upsHandler(){ 
+            var _this = this;  
+            var _cnt = count--;
+            console.log(_cnt);
+            if(count <= 0){
+                clearInterval(_body[0].counter);
+                console.log("2.PHPoC 장애!!!!!");
+        
+                // 3. 네트워크 단절(_body[0]이 20초 이상 들어오지 않는다.)
+                // ups 장비 문제?? 네트워크 문제???
+                var stateLine = parseInt(upsObj[_idx].state_line);
+                var stateBattery = parseInt(upsObj[_idx].state_battery);
+                console.log(stateLine,"/",stateBattery)
+                if(stateLine === 1  && stateBattery === 1){
+                    console.log("방전!!!");
+                    var errHasProperty = errorObj.hasOwnProperty(_idx);
+                    if(errHasProperty){
+                        //방전
+                        var dischargeObj = upsObj[_idx];
+                        var recordTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+                        dischargeObj.recordTime = recordTime;
+                        dischargeObj.dischargeTime = recordTime;
+                        dischargeObj.blackoutTime = errorObj[_idx].blackoutTime;
+                        dischargeObj.errorType = 2;
+                        errorObj[_idx].recordTime=recordTime;
+                        errorObj[_idx].dischargeTime = recordTime;
+                        errorObj[_idx].errorType = 2;
+                        deviceInfo.recordTime = recordTime;
+                        deviceInfo.result = 'closed';
+                        deviceInfo.errorTime = recordTime;
+                        
+                        networkError(deviceInfo);
+                        _query = queryconfig.error_discharge(dischargeObj);
+                        conn.query(_query, function(err, rows, fields){
+                            if(err){
+                                console.log(err)
+                                }else {
+                                    //res.json(rows);
+                                    console.log("discharge!!!!!!!!")
+                                }
+                            });
+                        }
+                        upsObj[_idx].errorType = 2;
+                        upsObj[_idx].result = 'closed',
+                        console.log("방전!!!>>>>>>>",upsObj[_idx])
+                        resultScan(upsObj[_idx]);
+                        var disChargeObj = {};
+                        disChargeObj.deviceIndex = upsObj[_idx].ups_idx;
+                        disChargeObj.errorType = upsObj[_idx].errorType;
+                        alarm.send(disChargeObj);
+                        deviceInfo.sendYN = 'Y';
+
+                }
+                else if(stateBattery !== 1 ){
+                    console.log("네트워크 장애!!!");
+                    var recordTime = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+                    deviceInfo.recordTime = recordTime;
+                    deviceInfo.errorTime = recordTime;
+                    deviceInfo.result = 'closed';
+                    networkError(deviceInfo);
+                    deviceInfo.ups_idx = deviceInfo.device_index;
+                    networkResult(deviceInfo);
+
+                    upsObj[_idx].errorType = 3;
+                    upsObj[_idx].result = 'closed',
+                    console.log("네트워크 장애!!!>>>>>>>",upsObj[_idx])
+                    console.log('deviceInfo>>>>>>', deviceInfo);
+                    resultScan(upsObj[_idx]);
+                    
+
+                    // 알림메시지 전송
+                    var networErrkObj = {};
+                    networErrkObj.deviceIndex = upsObj[_idx].ups_idx;
+                    networErrkObj.errorType = upsObj[_idx].errorType;
+                    alarm.send(networErrkObj);
+
+                }
+                return;
+            }
+        } // end upsHandler
+
+});
+
+function insertLog(data){
+    var _data = data;   
+    _data.recordTime=moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+    var _query = queryconfig.insert_log(_data);
+    conn.query(_query, function(err, rows, fields){
+        if(err){
+            res.status(404).end(); 
+        }else {
+            //res.json(rows);
+            //console.log(rows);
+        }
+    });
+}
+
+function resultScan(data){
+    var _data = data;   
+    var _query = queryconfig.recordUpdate(_data);
+    conn.query(_query, function(err, rows, fields){
+        if(err){
+            console.log(err); 
+        }else {
+            //res.json(rows);
+            //console.log(rows);
+        }
+    });
+}
+
+
+function upsErrorRestore(data){
+    var _data = data;
+    _query = queryconfig.error_restore(_data);
+    console.log("restor-->>", _query);
+    conn.query(_query, function(err, rows, fields){
+        if(err){
+            console.log("err")
+        }else {
+            //res.json(rows);
+            console.log("정상 복구!!!!")
+        }
+    });
+}
+
+
+function networkError(data){
+    var _data = data;
+    var _query = error_queryconfig.insert(data);
+    console.log(_query);
+    conn.query(_query, function(err, rows, fields){
+        if(err){
+            console.log(err);
+        }else {
+            //res.json(rows);
+            //console.log(rows);
+        }
+    });
+}
+
+function networkRestore(data){
+    var _data = data;
+    var _query = error_queryconfig.restoreUpdate(data);
+    console.log(_query);
+    conn.query(_query, function(err, rows, fields){
+        if(err){
+            console.log(err);
+        }else {
+            //res.json(rows);
+            //console.log(rows);
+        }
+    });
+}
+
+function networkResult(data){
+    var _data = data;
+    var _query = network_queryconfig.upsNetworkUpdate(_data);
+    conn.query(_query, function(err, rows, fields){
+        if(err){
+            console.log(err); 
+        }else {
+            //res.json(rows);
+            //console.log(rows);
+        }
+    });
+}
+
+
+
+module.exports = router;

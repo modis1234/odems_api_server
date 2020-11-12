@@ -1,0 +1,147 @@
+var portscanner = require('../lib/portscanner');
+var mysql = require("mysql");
+var network_queryconfig = require('../query/network_query');
+var error_queryconfig = require('../query/error_query');
+var dbconfig = require('../config/database');
+var conn = mysql.createConnection(dbconfig);
+
+var moment = require('moment');
+require('moment-timezone');
+moment.tz.setDefault("Asia/Seoul");
+
+const _portScanner = {
+    networkList:[],
+    errorNetwork:[],
+    scanStartFnc: function() {
+      var _this = this;
+      var _network = _this.networkList;
+      console.log(_network);
+      if(!_network) {
+        for (var i = 0; i < _network.length; i++) {
+          //console.log(i,")-->>",_network[i].url);
+          var scanObj = {};
+          scanObj.id = _network[i].id;
+          scanObj.url = _network[i].url;
+          scanObj.port = _network[i].port;
+          console.log(scanObj);
+          _this.portScan(scanObj);
+        }
+      }
+    },
+    start: function() {
+        var _this =this;
+        timer = setInterval(function(){
+          var _network = _this.networkList;
+            for (var i = 0; i < _network.length; i++) {
+              var scanObj = {};
+              scanObj.id = _network[i].id;
+              scanObj.url = _network[i].url;
+              scanObj.port = _network[i].port;
+              scanObj.deviceId = _network[i].device_id;
+              scanObj.location =_network[i].location;
+              _this.portScan(scanObj);
+            }
+          
+        },20000);
+    },
+    stop: function(){
+      console.log("stop");
+       clearInterval(this.timer);
+    },
+    portScan : function(scanObj) {
+      var _this = this;
+      var _ip = scanObj.url;
+      var _port =  scanObj.port;
+
+      portscanner.checkPortStatus(_port, _ip, function (error, status) {
+        // Status should be 'open' since the HTTP server is listening on that port
+       // console.log('Status at ip='+_ip+', port= '+_port+' is ' + status);
+        var date = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+        scanObj.date=date;
+        scanObj.result = status;
+        if(status === "open"){
+          //1.errorNetwork에 데이터 있는지 확인
+          var openIdx = _this.errorNetwork.findIndex((item, idx)=>{
+            return item.id === scanObj.id;
+          });
+          //1-1 errorNetwork에 데이터가 있다면, errorNetwork에서 제거
+          //closed --> open
+          if(openIdx > -1){
+           // console.log(">>open 있다--->",openIdx);
+             //console.log("before->",_this.errorNetwork);
+            _this.errorNetwork.splice(openIdx, 1);
+           _this.insertError(scanObj);
+           //console.log("after->",_this.errorNetwork);
+
+          }else if(openIdx === -1){
+            //console.log(">>open 없다--->",openIdx);
+          }
+          scanObj.errorTime =null
+          
+        }else if(status === "closed"){     
+          //2.errorNetwork에 데이터 있는지 확인
+          var closeIdx = _this.errorNetwork.findIndex((item, idx)=>{
+              return item.id === scanObj.id;
+           });
+           //2-1. errorNetwork에 없다면
+           //open --> closed
+           if(closeIdx === -1){
+             errorObj = {};
+             errorObj["id"] = scanObj.id;
+             errorObj["result"] = scanObj.result;
+             errorObj["errorTime"] = date;
+             //2-1-1. errorNetwork에 등록
+            _this.errorNetwork.push(errorObj);
+           _this.insertError(scanObj);
+           }else if(closeIdx > -1){
+             // console.log("errorNet-->", _this.errorNetwork);
+           }
+           //3. 해당 id에 erroNetwork 데이터 가져온다.
+           var errTime = _this.errorNetwork.find(item => item.id === scanObj.id) || {};
+           if(errTime.errorTime){
+             //console.log(errTime);
+             //3-1. errorNetwork에 찍는다.
+            scanObj.errorTime = '"'+errTime.errorTime+'"';
+          }
+        }    
+        _this.resultUpdate(scanObj);
+        if (error) {
+            return;
+        }
+      });
+    },
+    resultUpdate : function(scanObj) {
+        var _result = scanObj.result;   
+       // scanObj.errorTime = (_result === "open")? null : '"'+_errorTime+'"';
+        var _query = network_queryconfig.scanResult(scanObj);
+        conn.query(_query, function(err, rows, fields) {
+          if(err) {
+              res.send("error");
+            }else {
+               var _recordTime = scanObj.date;
+                var _url = scanObj.url;
+                var _port = scanObj.port;
+               // console.log(_url);
+            }
+        });
+    },
+    insertError: function(data) {
+      var date = moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+      var errorObj = data;
+      errorObj.recordTime =errorObj.date;
+       var _query = error_queryconfig.insert(errorObj);
+     //  console.log("query-->>>",_query);
+          conn.query(_query, function(err, rows, fields) {
+            if(err) {
+              console.log(err)
+            }else {
+              //console.log("rows->",rows);
+
+            }
+        });
+
+    } 
+    
+};
+
+module.exports = _portScanner;

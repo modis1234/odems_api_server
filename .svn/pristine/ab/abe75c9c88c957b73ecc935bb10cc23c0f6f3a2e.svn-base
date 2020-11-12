@@ -1,0 +1,168 @@
+const _query = {
+   counts: function() {
+      var query = 'SELECT count(*) FROM network';
+      return query
+   },
+   selectAll:function(){
+
+      var query = 'SELECT * FROM network_view';
+      //var query = 'SELECT * from network;';
+      return query;
+   },
+   // selectAll:function(){
+
+   //    var query = 'SELECT n.id, n.created_date, n.modified_date, '
+   //                +'n.url, n.port, n.ne_type, n.location, n.company_id, '
+   //                +'n.result, n.record_time, n.description, n.error_time, '
+   //                +'n.device_idx, c.site_name, c.comp_name '
+   //                +'FROM network n '
+   //                +'JOIN company c '
+   //                +'ON n.company_id = c.id;';
+   //    //var query = 'SELECT * from network;';
+   //    return query;
+   // },
+   selectOne:function(seq){
+      var _seq = seq;
+      var query = 'select * from network where id='+_seq;
+      return query;
+   },
+   insert:function(data){
+     var _data = data;
+      var _createdDate = _data.date || null; 
+      var _url = _data.url || null;
+      var _port = _data.port || 0;
+      var _neType = _data.neType || 99;
+      var _location = _data.location || null;
+      var _companyId = _data.companyId || 0;
+      var _siteId = _data.siteId || 0;
+      var _description = _data.description || null;
+      var _deviceIdx = "ups"+_url.split(".")[0]+_port;
+      console.log(data.neType);
+   
+      var query = '';
+      //upr: id =6;
+      if(_neType === 6){
+         query = 'INSERT INTO network (created_date, url, port, ne_type, location, company_id, site_id,description) VALUES ("'+_createdDate+'", "'+_url+'", '+_port+', '+_neType+', "'+_location+'", '+_companyId+', '+_deviceId+',"'+_description+'");'
+                + 'INSERT INTO ups (created_date, device_idx, company_id, location) VALUES ("'+_createdDate+'","'+_deviceIdx+'", '+_companyId+', "'+_location+'");';
+      } else {
+
+       query = 'INSERT INTO network (created_date, url, port, ne_type, location, company_id, site_id, description) '
+         +'VALUES ("'+_createdDate+'", "'+_url+'", '+_port+', '+_neType+', "'+_location+'", '+_companyId+', '+_siteId+','+_description+');'
+      }
+         return query;
+   },
+   update:function(data){
+      var _data = data;
+      var _id = _data.id;
+      var _modifiedDate = _data.date;
+      var _url = _data.url;
+      var _port = _data.port;
+      var _neType = _data.neType;
+      var _location = _data.location;
+      var _companyId = _data.companyId;
+      var _siteId = _data.siteId;
+      var _description = _data.description;
+      console.log("data-->>",_data);
+
+      var query = 'UPDATE network SET '
+                  +'modified_date="'+_modifiedDate+'", '
+                  +'url="'+_url+'", '
+                  +'port="'+_port+'", '
+                  +'ne_type='+_neType+', '
+                  +'location="'+_location+'", '
+                  +'company_id='+_companyId+', '
+                  +'site_id='+_siteId+', '
+                  +'description="'+_description+'" '
+                  +'WHERE id='+_id+";"
+
+       return query;
+
+   },
+   scanResult: function(data) {
+      var _data =data;
+      var _id = _data.id;
+      var _recordTime =  _data.date;
+      var _result = _data.result;
+      var _errorTime = _data.errorTime || null;
+      var query = 'UPDATE network SET '
+                  +'result="'+_result+'", '
+                  +'record_time="'+_recordTime+'", '
+                  +'error_time='+_errorTime+' '
+                  +'WHERE id='+_id+";"
+      return query;
+   },
+   delete:function(id){
+      var _id = id;
+      var _query = 'DELETE FROM network WHERE id='+_id;
+
+       return _query;
+
+   },
+   findBycompanyNdeviceNlocation: function(params) {
+    //1. company_id=true, ne_type=true, location=true;
+      var _params = params;
+      var _companyId = _params.companyId;
+      var _neType = _params.neType;
+      var _location = _params.location;
+
+      var _query = 'SELECT * FROM network WHERE company_id='+_companyId+' and ne_type='+_neType+' and location like "%'+_location+'%";';
+      
+      return _query;
+      
+   },
+   findBydeviceNlocation: function(params) {
+    //2. company_id=false, ne_type=true, location=true;
+      var _params = params;
+      var _neType = _params.neType;
+      var _location = _params.location;
+
+      var _query = 'SELECT * FROM network WHERE ne_type='+_neType+' and location like "%'+_location+'%";';
+
+      return _query;
+
+   },
+   findBydevice: function(params) {
+    //3. company_id=false, ne_type=true, location=false;
+      var _params = params;
+      var _neType = _params.neType;
+
+      var _query = 'SELECT * FROM network WHERE ne_type='+_neType+";";
+      
+      return _query;
+
+   },
+   findBycompanyNlocation: function(params) {
+    //4. company_id=true, ne_type=false, location=true;
+      var _params = params;
+      var _companyId = _params.companyId;
+      var _location = _params.location;
+
+      var _query = 'SELECT * FROM network WHERE company_id='+_companyId+' and location like "%'+_location+'%";';
+      
+      return _query;
+   },
+   findBycompanyNdevice: function(params) {
+     //5. company_id=true, ne_type=true, location=false;
+      var _params = params;
+      var _companyId = _params.companyId;
+      var _neType = _params.neType;
+
+      var _query = 'SELECT * FROM network WHERE company_id='+_companyId+' and ne_type='+_neType+';';
+      
+      return _query;
+   },
+   findGroupBynetwork: function(){
+      var query = 'SELECT site_id AS site_id, site_name, ne_type, device_name, COUNT(ne_type) AS neType_count FROM network_view GROUP BY site_id, ne_type ORDER BY site_id';
+
+      return query;
+
+   },
+   findSiteBynetwork: function(id){
+      var _id = id;
+      var query = 'SELECT * FROM network_view WHERE site_id ='+_id;
+      return query;
+
+   }
+}
+
+module.exports=_query;

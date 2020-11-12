@@ -1,0 +1,54 @@
+const _query = {
+    counts: function() {
+       var query = 'SELECT count(*) FROM hds_manager';
+       return query
+    },
+    selectAll: function(){
+       return 'SELECT * FROM hds_manager_view';
+    },
+    selectOne: function(id){
+       var _id = id;
+       var query = 'SELECT * FROM hds_manager where id='+_id;
+       return query;
+    },
+    insert: function(data){
+      var _data = data;
+      var _level = _data.level;
+      var _name = _data.name;
+      var _tel = _data.tel;
+      var _upsId = _data.upsId;
+
+      var query = 'INSERT INTO hds_manager (level, name, tel, ups_id) '
+                   +'VALUES ('+_level+', "'+_name+'", "'+_tel+'", "'+_upsId+'");';
+
+      return query;
+   },
+    update: function(data){
+        var _data = data;
+        var _id = _data.id;
+        var _level = _data.level;
+        var _name = _data.name;
+        var _tel = _data.tel;
+        var _upsId = _data.upsId;
+      console.log(">>>",_data);
+        
+      var query = 'UPDATE hds_manager SET '
+                +'level='+_level+', '
+                +'name="'+_name+'", '
+                +'tel="'+_tel+'", '
+                +'ups_id='+_upsId+' '
+                +'WHERE id='+_id+';';
+ 
+      return query;
+ 
+    },
+    delete: function(id){
+       var _id = id;
+       
+       var query = 'DELETE FROM hds_manager where id='+id;
+       return query;
+    }
+ }
+ 
+ module.exports=_query;
+ 

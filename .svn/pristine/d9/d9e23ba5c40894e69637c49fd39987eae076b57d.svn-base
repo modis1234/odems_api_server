@@ -1,0 +1,56 @@
+const _query = {
+   counts: function() {
+      var query = 'SELECT count(*) FROM network_error';
+      return query
+   },
+   selectAll:function(){
+      return 'SELECT * from network_error;'
+   },
+   selectOne:function(seq){
+      var _seq = seq;
+      var query = 'select * from network_error where id='+_seq;
+      return query;
+   },
+   insert:function(data){
+      var _data = data;
+      var _recordTime = '"'+_data.recordTime+'"' || null;
+      var _errorTime = '"'+_data.errorTime+'"' || null;
+      var _url = _data.url || null;
+      var _port = _data.port || 0;
+      var _deviceId = _data.deviceId || 1;
+      var _location = _data.location || null;
+      var _siteId = _data.siteId || 1;
+      var _result = _data.result || null;
+
+      var query = 'INSERT INTO network_error (record_time, error_time, url, port, device_id, location, site_id, result) '
+                  +'VALUES ('+_recordTime+', '+_errorTime+',"'+_url+'", '+_port+', '+_deviceId+', "'+_location+'", '+_siteId+', "'+_result+'" );';
+
+      return query;
+   },
+   restoreUpdate:function(data){
+      var _data = data;
+      var _recordTime = '"'+_data.recordTime+'"' || null;
+      var _errorTime = '"'+_data.errorTime+'"' || null;
+      var _restoreTime = '"'+_data.restoreTime+'"' || null;
+      var _result = _data.result;
+      var _url = _data.url;
+      var _count = _data.count;
+
+      var query = 'UPDATE network_error SET '
+                +'record_time='+_recordTime+', '
+                +'restore_time='+_restoreTime+', '
+                +'count='+_count+', '
+                +'result="'+_result+'" '
+                +'WHERE error_time='+_errorTime+' AND url="'+_url+'";';
+      return query;
+   },
+   delete:function(id){
+      var _id = id;
+      var _query = 'DELETE FROM network_error WHERE id='+_id;
+
+       return _query;
+
+   }
+}
+
+module.exports=_query;
