@@ -10,7 +10,7 @@ require('moment-timezone');
 moment.tz.setDefault("Asia/Seoul");
 
 const _alarm = {
-    server:'http://127.0.0.1:8099',
+    server:'http://119.207.78.144:8099',
     send: function(obj) {
         var _this = this;
         var _obj = obj;
